@@ -1,0 +1,4 @@
+while :
+    do
+        python /home/pi/blarg.py
+done

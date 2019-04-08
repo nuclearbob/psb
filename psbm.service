@@ -1,0 +1,15 @@
+[Unit]
+Description=PSBM Service
+ConditionPathExists=|/usr/bin
+After=network.target
+
+[Service]
+User=pi
+ExecStart=/bin/bash /home/pi/psbm2.sh
+
+# Restart every >2 seconds to avoid StartLimitInterval failure
+RestartSec=3
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
