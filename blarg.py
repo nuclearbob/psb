@@ -1,21 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import datetime
 import hashlib
-import json
 import os
-import random
 import re
 import string
 import time
 
 import RPi.GPIO as GPIO
-#Import the necessary methods from tweepy library
-from tweepy.streaming import StreamListener
-from tweepy import OAuthHandler
-from tweepy import Stream
-
-from twitter_info import *
 
 
 BLANK = [0, 0, 0]
@@ -23,20 +15,23 @@ MAGENTA = [0xf7, 0x0b, 0xef]
 BLUE = [0x14, 0xcd, 0xd9]
 LINK = '.-.. .. -. -.-'
 IMAGE = '.. -- .- --. .'
-RED_PIN = 33
-GREEN_PIN = 35
-BLUE_PIN = 37
-PWM_FREQ = 60
+RED_PIN = 11
+GREEN_PIN = 13
+BLUE_PIN = 15
+PWM_FREQ = 100
+
+username='psblancmange'
 
 
-def show_lights(color):
+def set_lights_to_color(color):
+    print(color)
     red, green, blue = color_filter(color)
     RED_PWM.ChangeDutyCycle(red)
     GREEN_PWM.ChangeDutyCycle(green)
     BLUE_PWM.ChangeDutyCycle(blue)
 
 
-def morse(morsestring, dotcolor, dashcolor):
+def create_morse_list(morsestring, dotcolor, dashcolor):
     morselist = []
     for char in morsestring:
         if char == '.':
@@ -48,24 +43,24 @@ def morse(morsestring, dotcolor, dashcolor):
     return morselist
 
 
-def hexit(thing):
+def string_to_hex(char_string):
     chars = ''
-    for char in thing:
+    for char in char_string:
         digit = (ord(char.lower()) - 87) % 16
         newchar = "%x" % digit
         chars += newchar
     return chars
 
 
-def stringlights(lightstring, lang):
+def get_lights_from_string(light_string, lang):
     lights = []
-    for char in lightstring:
+    for char in light_string:
         if char in string.whitespace:
             # print('DEBUG: whitespace')
             lights.append(BLANK)
         else:
-            digits = str(ord(char)) + hexit(lang) + '0000'
-            digits = hashlib.md5(digits).hexdigest()[0:6]
+            digits = str(ord(char)) + string_to_hex(lang) + '0000'
+            digits = hashlib.md5(digits.encode()).hexdigest()[0:6]
             hexes = [int(digits[0:2], 16),
                      int(digits[2:4], 16),
                      int(digits[4:6], 16)]
@@ -74,7 +69,7 @@ def stringlights(lightstring, lang):
     return(lights)
 
 
-def tweetlights(tweet, name='@{}'.format(username), method=show_lights):
+def set_lights_from_a_tweet(tweet, name='@{}'.format(username), method=set_lights_to_color):
     #print(tweet)
     if tweet['user']['screen_name'] == username:
         vampirism()
@@ -93,33 +88,34 @@ def tweetlights(tweet, name='@{}'.format(username), method=show_lights):
     resplit = '({})'.format('|'.join(images + links + handles))
     #print(text)
     #print(resplit)
-    bits = re.split(resplit, text, flags=re.IGNORECASE)
-    for bit in bits:
+    chunks = re.split(resplit, text, flags=re.IGNORECASE)
+    for chunk in chunks:
         #print('DEBUG: bit %s' % bit)
-        if bit in images:
+        if chunk in images:
             #print('DEBUG: image')
-            lightsequence(morse(IMAGE, BLUE, MAGENTA), method)
-        elif bit in links:
+            set_sequence_of_lights(create_morse_list(IMAGE, BLUE, MAGENTA), method)
+        elif chunk in links:
             #print('DEBUG: link')
-            lightsequence(morse(LINK, MAGENTA, BLUE), method)
-        elif bit.upper() == '@ZEDMARTINEZ':
+            set_sequence_of_lights(create_morse_list(LINK, MAGENTA, BLUE), method)
+        elif chunk.upper() == '@ZEDMARTINEZ':
             #print('zed')
             demigod_mode()
-        elif bit.upper() == '@NUCLEARBOB':
+        elif chunk.upper() == '@NUCLEARBOB':
             #print('bob')
             god_mode()
         else:
            # print('regular')
-            lightsequence(stringlights(bit, tweet['lang']), method)
+            set_sequence_of_lights(get_lights_from_string(chunk, tweet['lang']), method)
 
 
 def god_mode():
-    show_lights([0x00, 0x00, 0xff])
+    set_lights_to_color([0x00, 0x00, 0xff])
     time.sleep(5)
 
 
 def demigod_mode():
     gradient([0xfc, 0x00, 0xff], [0xff, 0x8a, 0x00], 5, 100)
+
 
 def strip_name(text, name):
     text = re.sub(' ' + '(?i)' + re.escape(name), '', text)
@@ -127,7 +123,8 @@ def strip_name(text, name):
     text = re.sub('(?i)' + re.escape(name), '', text)
     return text
 
-def lightsequence(colors, method):
+
+def set_sequence_of_lights(colors, method):
     #print('sequence')
     for color in colors:
         method(color)
@@ -178,7 +175,7 @@ def gradient(start, end, duration, steps):
     wait = duration/steps
     for _ in range(steps):
         #print([red, green, blue])
-        show_lights([red, green, blue])
+        set_lights_to_color([red, green, blue])
         red += step_red
         green += step_green
         blue += step_blue
@@ -187,13 +184,13 @@ def gradient(start, end, duration, steps):
 
 def a():
     gradient([0xfc, 0x05, 0xd6], [0x70, 0x00, 0x05], 0.2, 10)
-    show_lights(BLANK)
+    set_lights_to_color(BLANK)
     time.sleep(0.02)
 
 
 def b():
     start = [0xd9, 0x02, 0x0b]
-    show_lights(start)
+    set_lights_to_color(start)
     time.sleep(0.2)
     gradient(start, BLANK, 0.1, 10)
 
@@ -201,11 +198,11 @@ def b():
 def c():
     gradient([0xe7, 0x3b, 0x05], [0xf0, 0x58, 0x04], 0.6, 10)
     gradient([0xf0, 0x68, 0x04], [0xff, 0xb4, 0x00], 0.25, 10)
-    show_lights(BLANK)
+    set_lights_to_color(BLANK)
 
 
 def d():
-    show_lights(BLANK)
+    set_lights_to_color(BLANK)
     time.sleep(0.2)
 
 
@@ -271,30 +268,9 @@ GPIO.setup(BLUE_PIN, GPIO.OUT)
 
 RED_PWM = GPIO.PWM(RED_PIN, PWM_FREQ)
 GREEN_PWM = GPIO.PWM(GREEN_PIN, PWM_FREQ)
-BLUE_PWM = GPIO.PWM(BLUE_PIN, PWM_FREQ)
+BLUE_PWM = GPIO.PWM(BLUE_PIN,PWM_FREQ)
 
 
 RED_PWM.start(0)
 GREEN_PWM.start(0)
 BLUE_PWM.start(0)
-
-
-class StdOutListener(StreamListener):
-    def on_data(self, data):
-        actual_data = json.loads(data)
-        tweetlights(actual_data)
-    def on_error(self, status):
-        print(status)
-
-
-def main():
-    l = StdOutListener()
-    auth = OAuthHandler(consumer_key, consumer_secret)
-    auth.set_access_token(access_token, access_token_secret)
-    stream = Stream(auth, l)
-#    stream.filter(follow=['@' + username])
-    stream.filter(track=['@' + username])
-
-
-if __name__ == '__main__':
-    main()
